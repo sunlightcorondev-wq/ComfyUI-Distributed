@@ -738,7 +738,7 @@
       "outputs": [],
       "properties": {},
       "widgets_values": [
-        "Use this node to set how many videos to output.\n\nExample: if you have 1x master and 2x workers, set it to 3."
+        "Use this node to set how many videos to output.\n\nSet divide_by to 0 to give every enabled account its own output (master + workers), then wire one save node per account.\n\nExample: with 1x master and 2x workers you can also set it to 3 manually."
       ],
       "color": "#432",
       "bgcolor": "#653"

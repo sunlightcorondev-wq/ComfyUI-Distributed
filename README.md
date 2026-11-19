@@ -112,10 +112,20 @@ Generate multiple videos in the time it takes to generate one. Each worker uses 
 2. Add **Distributed Seed** → connect to sampler's seed
 3. Add **Distributed Collector** → after VAE Decode
 4. Add **Image Batch Divider** → after Distributed Collector
-5. Set the `divide_by` to the number of GPUs you have available
-> For example: if you have a master and 2x workers, set it to 3
-7. Enable workers in the UI
-8. Run the workflow!
+5. Set `divide_by` to `0` (auto) so it uses however many accounts are enabled, or set a fixed number to pin the split
+> Auto mode resolves to master + enabled workers at dispatch time — add or remove Colab accounts and the same workflow scales
+6. Enable workers in the UI
+7. Run the workflow!
+
+### Adaptive Segment Rendering (any number of accounts)
+Split one long video into one segment per participating account instead of a fixed 3 x 2s plan, then stitch the segments back into a single timeline. Segment count, keyframe count, and the frame window each account renders are derived from the enabled accounts at run time.
+
+> [Read the guide](/docs/adaptive-video-segments.md)
+
+1. Add **Adaptive Video Segments** and set the target duration and fps (leave `num_segments` at `0`)
+2. Wire `frames` into the video sampler length and `first_keyframe` / `last_keyframe` into your [start/end frame](/docs/adaptive-video-segments.md) selection
+3. Add **Adaptive Video Stitcher**, wire the collector's combined `images` and the planner's `plan` into it, then save its `images`
+4. Enable as many accounts as you like and run; the plan re-derives itself on every dispatch
 
 ### Distributed Image Upscaling
 Accelerate Ultimate SD Upscaler by distributing tiles across multiple workers, with speed scaling as you add more GPUs.
@@ -180,8 +190,10 @@ Use **Distributed Value** when you want per-worker overrides (for example, diffe
 | **Distributed Collector** | Collects results (image/video frames and optionally audio) from workers back to the master; `load_balance` routes each run to one free participant, or to the next GPU that frees up when all are busy |
 | **Distributed Value** | Outputs per-worker override values with fallback to default |
 | **Ultimate SD Upscale Distributed** | Distributes upscale tiles across workers |
-| **Image Batch Divider** | Splits image batches for multi-GPU output |
-| **Audio Segment Divider** | Splits an audio waveform into up to ten sequential time segments |
+| **Image Batch Divider** | Splits image batches for multi-GPU output; `divide_by = 0` auto-uses the number of participating accounts |
+| **Audio Segment Divider** | Splits an audio waveform into up to sixteen sequential time segments; `divide_by = 0` auto-splits per account |
+| **Adaptive Video Segments** | Plans one video segment per participating account (Wan-aligned frame windows, keyframe indexes, stitched length) |
+| **Adaptive Video Stitcher** | Joins per-account segments in order and drops duplicated boundary frames |
 | **Distributed Model Name** | Passes model paths to workers, enabling workflows to use models not present on the master in orchestrator-only mode |
 | **Distributed Empty Image** | Produces an empty IMAGE batch used when the master delegates all work |
 | **Distributed Image List Start** | Turns an image list or batch into one job per image, scheduled to the next available participant; mask and value inputs are shared across images or paired one per image |

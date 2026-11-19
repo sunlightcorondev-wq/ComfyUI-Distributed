@@ -59,14 +59,32 @@ class ImageBatchDividerTests(unittest.TestCase):
         self.assertEqual(outputs[1][:, 0, 0, 0].tolist(), [4.0, 5.0, 6.0])
         self.assertEqual(outputs[2][:, 0, 0, 0].tolist(), [7.0, 8.0, 9.0])
 
+    def test_auto_divide_by_keeps_the_batch_whole_without_orchestration(self):
+        divider = utils.ImageBatchDivider()
+        images = torch.arange(4, dtype=torch.float32).reshape(4, 1, 1, 1)
+
+        outputs = divider.divide_batch(images, 0)
+
+        self.assertEqual(len(outputs), utils.MAX_DIVIDER_OUTPUTS)
+        self.assertEqual(outputs[0].shape[0], 4)
+        self.assertEqual(outputs[1].shape[0], 0)
+
+    def test_divide_by_supports_more_than_ten_parts(self):
+        divider = utils.ImageBatchDivider()
+        images = torch.arange(16, dtype=torch.float32).reshape(16, 1, 1, 1)
+
+        outputs = divider.divide_batch(images, 16)
+
+        self.assertEqual([out.shape[0] for out in outputs[:16]], [1] * 16)
+
     def test_unused_image_outputs_are_empty(self):
         divider = utils.ImageBatchDivider()
         images = torch.arange(4, dtype=torch.float32).reshape(4, 1, 1, 1)
 
         outputs = divider.divide_batch(images, 2)
 
-        self.assertEqual(len(outputs), 10)
-        for idx in range(2, 10):
+        self.assertEqual(len(outputs), utils.MAX_DIVIDER_OUTPUTS)
+        for idx in range(2, utils.MAX_DIVIDER_OUTPUTS):
             self.assertEqual(outputs[idx].shape[0], 0)
 
 
@@ -93,8 +111,8 @@ class AudioBatchDividerTests(unittest.TestCase):
 
         outputs = divider.divide_audio(audio, 2)
 
-        self.assertEqual(len(outputs), 10)
-        for idx in range(2, 10):
+        self.assertEqual(len(outputs), utils.MAX_DIVIDER_OUTPUTS)
+        for idx in range(2, utils.MAX_DIVIDER_OUTPUTS):
             self.assertEqual(outputs[idx]["waveform"].shape[-1], 0)
 
 

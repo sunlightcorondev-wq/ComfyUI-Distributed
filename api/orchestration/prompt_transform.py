@@ -683,6 +683,64 @@ def _override_image_list_nodes(prompt_copy, prompt_index, participant_id, worker
             inputs["image_list_workflow_meta"] = workflow_meta
 
 
+def count_participants(enabled_worker_ids, delegate_master):
+    """Number of accounts taking part in this run (master included unless delegating)."""
+    return len(enabled_worker_ids or []) + (0 if delegate_master else 1)
+
+
+def _divide_by_is_linked(value):
+    """True when the widget was converted to a link to another node's output."""
+    return isinstance(value, (list, tuple))
+
+
+def _override_divider_nodes(prompt_copy, prompt_index, participants):
+    """Resolve ``divide_by = 0`` (auto) to the run's participant count.
+
+    Dividers with a positive value keep their manual setting, so a workflow
+    can still pin a fixed split. Auto mode makes one job per account, which
+    is what lets the same workflow scale from 2 Colab accounts to the whole
+    fleet.
+    """
+    for class_name in ("ImageBatchDivider", "AudioBatchDivider"):
+        for node_id in prompt_index.nodes_for_class(class_name):
+            node = prompt_copy.get(node_id)
+            if not isinstance(node, dict):
+                continue
+            inputs = node.setdefault("inputs", {})
+            value = inputs.get("divide_by")
+            if _divide_by_is_linked(value):
+                continue
+            try:
+                requested = int(value or 0)
+            except (TypeError, ValueError):
+                continue
+            if requested <= 0:
+                inputs["divide_by"] = max(1, int(participants))
+
+
+def _override_video_plan_nodes(prompt_copy, prompt_index, is_master, participant_id,
+                               worker_index_map, enabled_json, delegate_master):
+    """Give adaptive video nodes this run's fleet size and participant identity."""
+    participants = count_participants(list(worker_index_map), delegate_master)
+    for node_id in prompt_index.nodes_for_class("DistributedVideoPlanner"):
+        node = prompt_copy.get(node_id)
+        if not isinstance(node, dict):
+            continue
+        inputs = node.setdefault("inputs", {})
+        inputs["enabled_worker_ids"] = enabled_json
+        inputs["delegate_only"] = bool(delegate_master)
+        inputs["is_worker"] = not is_master
+        inputs["worker_id"] = "" if is_master else f"worker_{worker_index_map.get(participant_id, 0)}"
+
+    for node_id in prompt_index.nodes_for_class("DistributedVideoStitcher"):
+        node = prompt_copy.get(node_id)
+        if not isinstance(node, dict):
+            continue
+        # The stitcher only joins whatever segments actually rendered; the
+        # fleet size keeps it from waiting on accounts that were idle.
+        node.setdefault("inputs", {})["num_participants"] = max(1, participants)
+
+
 def apply_participant_overrides(
     prompt_copy,
     participant_id,
@@ -697,6 +755,7 @@ def apply_participant_overrides(
     is_master = participant_id == "master"
     worker_index_map = {wid: idx for idx, wid in enumerate(enabled_worker_ids)}
     enabled_json = json.dumps(enabled_worker_ids)
+    participants = count_participants(enabled_worker_ids, delegate_master)
 
     _override_seed_nodes(prompt_copy, prompt_index, is_master, participant_id, worker_index_map)
     _override_value_nodes(prompt_copy, prompt_index, is_master, participant_id, worker_index_map)
@@ -728,6 +787,16 @@ def apply_participant_overrides(
         master_url,
         delegate_master,
         workflow_meta=workflow_meta,
+    )
+    _override_divider_nodes(prompt_copy, prompt_index, participants)
+    _override_video_plan_nodes(
+        prompt_copy,
+        prompt_index,
+        is_master,
+        participant_id,
+        worker_index_map,
+        enabled_json,
+        delegate_master,
     )
 
     return prompt_copy

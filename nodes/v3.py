@@ -70,11 +70,12 @@ class ImageBatchDivider(io.ComfyNode):
         return io.Schema(
             node_id='ImageBatchDivider', display_name='Image Batch Divider', category='image',
             inputs=[io.Image.Input('images'),
-                    io.Int.Input('divide_by', default=2, min=1, max=10, step=1,
+                    io.Int.Input('divide_by', default=2, min=0, max=_utilities.MAX_DIVIDER_OUTPUTS, step=1,
                                  display_mode=io.NumberDisplay.number,
-                                 tooltip='Number of parts to divide the batch into')],
-            # The existing frontend still displays only divide_by sockets.
-            outputs=[io.Image.Output(display_name=f'batch_{index + 1}') for index in range(10)],
+                                 tooltip='Number of parts to divide the batch into. '
+                                         '0 = auto (one part per enabled participant).')],
+            outputs=[io.Image.Output(display_name=f'batch_{index + 1}')
+                     for index in range(_utilities.MAX_DIVIDER_OUTPUTS)],
             is_output_node=True,
         )
 
@@ -89,10 +90,12 @@ class AudioBatchDivider(io.ComfyNode):
         return io.Schema(
             node_id='AudioBatchDivider', display_name='Audio Segment Divider', category='audio',
             inputs=[io.Audio.Input('audio'),
-                    io.Int.Input('divide_by', default=2, min=1, max=10, step=1,
+                    io.Int.Input('divide_by', default=2, min=0, max=_utilities.MAX_DIVIDER_OUTPUTS, step=1,
                                  display_mode=io.NumberDisplay.number,
-                                 tooltip='Number of sequential time segments to create')],
-            outputs=[io.Audio.Output(display_name=f'audio_{index + 1}') for index in range(10)],
+                                 tooltip='Number of sequential time segments to create. '
+                                         '0 = auto (one segment per enabled participant).')],
+            outputs=[io.Audio.Output(display_name=f'audio_{index + 1}')
+                     for index in range(_utilities.MAX_DIVIDER_OUTPUTS)],
             is_output_node=True,
         )
 
@@ -223,6 +226,94 @@ class DistributedWorkerSink(io.ComfyNode):
         return io.NodeOutput()
 
 
+class DistributedVideoPlanner(io.ComfyNode):
+    @classmethod
+    def define_schema(cls):
+        return io.Schema(
+            node_id='DistributedVideoPlanner', display_name='Adaptive Video Segments',
+            category='video',
+            inputs=[
+                io.Float.Input('duration_seconds', default=6.0, min=0.04, max=3600.0, step=0.01,
+                               tooltip='Target length of the finished video.'),
+                io.Int.Input('fps', default=24, min=1, max=240, step=1,
+                             tooltip='Frame rate of the finished video.'),
+                io.Int.Input('num_segments', default=0, min=0, max=_utilities.MAX_VIDEO_SEGMENTS, step=1,
+                             tooltip='0 = auto (one segment per participating account).'),
+                io.Int.Input('min_frames_per_segment', default=5, min=1, max=1000, step=1),
+                io.Boolean.Input('align_to_wan', default=True,
+                                 tooltip='Snap every segment to a Wan-valid 4k+1 frame count.'),
+                io.Boolean.Input('share_boundary_frames', default=True,
+                                 tooltip='Each segment ends on the frame the next one starts from; '
+                                         'stitching drops the duplicate.'),
+            ],
+            outputs=[
+                io.String.Output(display_name='plan'),
+                io.Int.Output(display_name='num_segments'),
+                io.Int.Output(display_name='segment_index'),
+                io.Int.Output(display_name='start_frame'),
+                io.Int.Output(display_name='end_frame'),
+                io.Int.Output(display_name='frames'),
+                io.String.Output(display_name='keyframe_times'),
+                io.Int.Output(display_name='stitched_frames'),
+                io.Int.Output(display_name='first_keyframe'),
+                io.Int.Output(display_name='last_keyframe'),
+            ],
+            accept_all_inputs=True,
+        )
+
+    @classmethod
+    def execute(cls, duration_seconds, fps, num_segments=0, min_frames_per_segment=5,
+                align_to_wan=True, share_boundary_frames=True, is_worker=False,
+                worker_id='', enabled_worker_ids='[]', delegate_only=False):
+        return io.NodeOutput(*_utilities.DistributedVideoPlanner().plan(
+            duration_seconds, fps, num_segments, min_frames_per_segment,
+            align_to_wan, share_boundary_frames, is_worker, worker_id,
+            enabled_worker_ids, delegate_only))
+
+
+class DistributedVideoStitcher(io.ComfyNode):
+    @classmethod
+    def define_schema(cls):
+        return io.Schema(
+            node_id='DistributedVideoStitcher', display_name='Adaptive Video Stitcher',
+            category='video',
+            inputs=[
+                io.Int.Input('num_segments', default=0, min=0, max=_utilities.MAX_VIDEO_SEGMENTS, step=1,
+                             tooltip='0 = auto (stitch every connected, non-empty segment).'),
+                io.Boolean.Input('share_boundary_frames', default=True,
+                                 tooltip="Drop each later segment's first frame, because it "
+                                         "repeats the previous segment's last frame."),
+                io.Int.Input('num_participants', default=0, min=0, max=_utilities.MAX_VIDEO_SEGMENTS,
+                             step=1, optional=True,
+                             tooltip='Internal: set by the orchestrator to the number of '
+                                     'participating accounts (0 = derive from connected segments).'),
+                io.Image.Input('images', optional=True,
+                               tooltip="Collector's combined images; ordered master then workers, "
+                                       'which matches the plan. Used when no per-account '
+                                       'segment sockets are connected.'),
+                io.String.Input('plan', default='', optional=True,
+                                tooltip='Wire the plan output of Adaptive Video Segments here '
+                                        'to cut the shared boundary frames.'),
+            ] + [
+                io.Image.Input(f'segment_{index + 1}', optional=True,
+                               tooltip='One rendered segment per account slot '
+                                       '(master, worker_1, ...). Overrides the combined input.')
+                for index in range(_utilities.MAX_DIVIDER_OUTPUTS)
+            ],
+            outputs=[io.Image.Output(display_name='images'),
+                     io.Int.Output(display_name='frames')],
+            accept_all_inputs=True,
+        )
+
+    @classmethod
+    def execute(cls, num_segments=0, share_boundary_frames=True, num_participants=0,
+                images=None, plan='', **segments):
+        return io.NodeOutput(*_utilities.DistributedVideoStitcher().stitch(
+            num_segments=num_segments, share_boundary_frames=share_boundary_frames,
+            num_participants=num_participants, images=images, plan=plan, **segments))
+
+
 NODES = [DistributedCollector, DistributedSeed, DistributedModelName, DistributedValue,
          ImageBatchDivider, AudioBatchDivider, DistributedEmptyImage, UltimateSDUpscaleDistributed,
-         DistributedWorkerSink, DistributedImageListStart, DistributedImageListEnd, DistributedImageListGetValue]
+         DistributedVideoPlanner, DistributedVideoStitcher, DistributedWorkerSink,
+         DistributedImageListStart, DistributedImageListEnd, DistributedImageListGetValue]

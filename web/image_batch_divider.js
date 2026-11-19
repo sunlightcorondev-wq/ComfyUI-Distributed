@@ -1,5 +1,10 @@
 import { app } from "/scripts/app.js";
 
+// Maximum sockets a divider can expose. `divide_by = 0` (auto) shows every
+// socket so the workflow can pre-wire one branch per account; the
+// orchestrator resolves the real count at dispatch time.
+const MAX_DIVIDER_OUTPUTS = 16;
+
 // Configuration for each batch divider node type
 const BATCH_DIVIDER_NODES = {
     "ImageBatchDivider": { outputPrefix: "batch_", outputType: "IMAGE" },
@@ -19,8 +24,12 @@ app.registerExtension({
                 const divideByWidget = node.widgets.find(w => w.name === "divide_by");
                 if (!divideByWidget) return;
 
-                const divideBy = parseInt(divideByWidget.value, 10) || 1;
-                const totalOutputs = divideBy;
+                const divideBy = parseInt(divideByWidget.value, 10);
+                // 0 (or blank) means auto: show every socket so any fleet size
+                // can be wired ahead of time.
+                const totalOutputs = (!divideBy || divideBy < 1)
+                    ? MAX_DIVIDER_OUTPUTS
+                    : Math.min(divideBy, MAX_DIVIDER_OUTPUTS);
 
                 // Ensure outputs array exists
                 if (!node.outputs) node.outputs = [];
