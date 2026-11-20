@@ -30,9 +30,10 @@ _PRIMITIVE_NODES = {
     "PrimitiveString": "",
 }
 # DistributedCollector outputs: images, audio, then the per-GPU previews
-# (PER_GPU_OUTPUT_NAMES in nodes/collector.py). Previews are valid link
-# sources in a workflow even though a pool only ever returns images and audio.
-COLLECTOR_OUTPUT_COUNT = 2 + 9
+# (PER_GPU_OUTPUT_NAMES in nodes/collector.py: master + worker_1..worker_16).
+# Previews are valid link sources in a workflow even though a pool only ever
+# returns images and audio.
+COLLECTOR_OUTPUT_COUNT = 2 + 17
 _REMOVED_NODE_OUTPUTS = {
     "DistributedCollector": set(range(COLLECTOR_OUTPUT_COUNT)),
     "DistributedSeed": {0},

@@ -23,7 +23,9 @@ prompt_server = _server.PromptServer.instance
 
 # Per-GPU preview outputs follow the combined images/audio outputs. worker_N is
 # the Nth worker in the config, so a slot keeps its GPU when others are toggled.
-MAX_WORKER_OUTPUTS = 8
+# Kept in step with the batch dividers so a segment wired per account has a
+# matching preview slot on runs with many Colab accounts.
+MAX_WORKER_OUTPUTS = 16
 PER_GPU_OUTPUT_NAMES = ("master",) + tuple(f"worker_{i + 1}" for i in range(MAX_WORKER_OUTPUTS))
 
 
