@@ -31,7 +31,11 @@ REPO_ROOT = APP_DIR.parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from utils.video_plan import MAX_VIDEO_SEGMENTS, plan_video_segments  # noqa: E402
+from utils.video_plan import (  # noqa: E402
+    MAX_VIDEO_SEGMENTS,
+    _round_half_up,
+    plan_video_segments,
+)
 
 FPS_CHOICES = (8, 12, 16, 24, 30)
 DEFAULT_CONFIG = REPO_ROOT / "gpu_config.json"
@@ -106,6 +110,11 @@ def read_fleet(config_path: Path | None = None) -> dict:
 # Planning
 # ---------------------------------------------------------------------------
 
+def _round3(value: float) -> float:
+    """Round to 3 decimals half-up so the browser port matches exactly."""
+    return _round_half_up(value * 1000) / 1000
+
+
 def _as_number(value, default, minimum, maximum):
     try:
         number = float(value)
@@ -176,9 +185,9 @@ def build_plan(payload: dict, fleet: dict | None = None) -> dict:
             "start_frame": segment["start_frame"],
             "end_frame": segment["end_frame"],
             "frames": segment["frames"],
-            "start_seconds": round(segment["start_frame"] / fps, 3),
-            "end_seconds": round((segment["end_frame"] + 1) / fps, 3),
-            "seconds": round(segment["frames"] / fps, 3),
+            "start_seconds": _round3(segment["start_frame"] / fps),
+            "end_seconds": _round3((segment["end_frame"] + 1) / fps),
+            "seconds": _round3(segment["frames"] / fps),
         })
 
     warnings = list(plan["warnings"])
@@ -207,9 +216,9 @@ def build_plan(payload: dict, fleet: dict | None = None) -> dict:
             "master_participates": master_participates,
             "segments": plan["num_segments"],
             "keyframes": len(plan["keyframe_frames"]),
-            "keyframe_times": [round(frame / fps, 3) for frame in plan["keyframe_frames"]],
+            "keyframe_times": [_round3(frame / fps) for frame in plan["keyframe_frames"]],
             "stitched_frames": plan["stitched_frames"],
-            "stitched_seconds": round(plan["stitched_frames"] / fps, 3),
+            "stitched_seconds": _round3(plan["stitched_frames"] / fps),
             "frames_per_account": sorted({segment["frames"] for segment in plan["segments"]}),
             "align_to_wan": align_to_wan,
             "share_boundary_frames": share_boundary,

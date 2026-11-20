@@ -12,13 +12,32 @@ Segments** node, so what the app shows is exactly what each account renders.
 
 ## Adaptive Studio
 
+Adaptive Studio is a **browser app**. It has two modes and the same UI for both:
+
+| Mode | How | Fleet |
+|---|---|---|
+| **Browser-only** | Open `apps/adaptive_studio/web/index.html`, or host that folder anywhere static (GitHub Pages, S3, a USB stick) | Import `gpu_config.json`, load the demo fleet, or plan manually |
+| **Server** | `python3 apps/adaptive_studio/server.py` | Read live from `gpu_config.json`, no import needed |
+
+Browser-only mode runs the planner in JavaScript (`web/planner.js`) inside the
+tab — no network calls, nothing uploaded. The page is plain HTML/CSS/JS with no
+build step and no framework, and it works from `file://` because the scripts are
+classic (non-module) files.
+
 ```bash
-python3 apps/adaptive_studio/server.py            # http://localhost:8765
+# server mode (recommended on the master: live fleet)
+python3 apps/adaptive_studio/server.py                  # http://localhost:8765
 python3 apps/adaptive_studio/server.py --port 9000 --open
 python3 apps/adaptive_studio/server.py --host 0.0.0.0   # reachable from other machines
+
+# browser-only mode
+open apps/adaptive_studio/web/index.html                       # double-click also works
+python3 -m http.server 8080 -d apps/adaptive_studio/web         # or serve the folder
 ```
 
-Standard library only — no new dependencies, nothing to build.
+The header badge tells you which mode is active (`server · live fleet` or
+`browser-only · no server`). Settings and the imported fleet persist in
+`localStorage`.
 
 - **Accounts** defaults to *Auto*, which reads `gpu_config.json` (the same file the
   Distributed panel writes) so the plan follows the workers you enabled. Switch to
@@ -32,7 +51,11 @@ Standard library only — no new dependencies, nothing to build.
 - Exports: plan JSON, keyframe times (comma separated), and an FFmpeg concat script
   that trims the duplicated boundary frames.
 
-Endpoints (all local JSON):
+In browser-only mode, **Import gpu_config.json** takes the file straight from your
+ComfyUI folder (read locally with the File API) and **Load demo fleet** pretends
+five Colab accounts exist so you can try the planner immediately.
+
+Endpoints (server mode, all local JSON):
 
 | Route | Purpose |
 |---|---|
@@ -72,6 +95,21 @@ the panel manually: **Add Worker → Remote → host = tunnel URL, port = 443**.
    changing `num_segments` (leave it at 0 = auto).
 5. Queue the workflow. Every enabled account renders one segment; the stitcher joins
    them on the master.
+
+## Keeping the two planners in sync
+
+`web/planner.js` mirrors `utils/video_plan.py`. A shared fixture,
+`apps/adaptive_studio/parity_vectors.json`, is generated from the Python
+implementation and asserted from both sides:
+
+```bash
+python3 apps/adaptive_studio/generate_parity_vectors.py   # after changing the planner
+python3 -m pytest tests/test_adaptive_studio.py -q         # Python side
+npx vitest run apps/adaptive_studio/tests                  # browser side (jsdom)
+```
+
+Changing either planner without regenerating the vectors fails one of the two
+suites, so the browser and the nodes cannot silently disagree about the split.
 
 Details, limits and troubleshooting: [adaptive-video-segments.md](../docs/adaptive-video-segments.md)
 and the [compatibility report](../docs/multi-account-test-report.md).

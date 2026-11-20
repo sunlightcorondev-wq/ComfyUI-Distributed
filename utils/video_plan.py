@@ -4,6 +4,18 @@ Kept dependency-free so both the node pack (``nodes/utilities.py``) and the
 standalone Adaptive Studio app (``apps/adaptive_studio``) share one planner.
 """
 import json
+import math
+
+
+def _round_half_up(value: float) -> int:
+    """Round .5 away from zero.
+
+    Python's round() is banker's rounding, which would disagree with the
+    browser port for exact halves; the planner must be identical in both.
+    """
+    if value >= 0:
+        return int(math.floor(value + 0.5))
+    return -int(math.floor(-value + 0.5))
 
 
 def _chunk_bounds(total_items: int, n_splits: int) -> list[tuple[int, int]]:
@@ -39,7 +51,7 @@ def _snap_to_wan_frames(frames: float, minimum: int) -> int:
     floor_valid = 4 * k_min + 1
     if frames <= floor_valid:
         return floor_valid
-    k = round((frames - 1) / 4)
+    k = _round_half_up((frames - 1) / 4)
     snapped = 4 * max(k, k_min) + 1
     return snapped
 
@@ -52,7 +64,7 @@ def _rebalance_wan_counts(counts: list[int], total: int, n: int, effective_min: 
     def stitched(frames: list[int]) -> int:
         return sum(frames) - (n - 1) if share_boundary_frames else sum(frames)
 
-    adjustment = int(round((total - stitched(counts)) / step))
+    adjustment = _round_half_up((total - stitched(counts)) / step)
     guard = 0
     index = 0
     while adjustment > 0 and guard < 4 * n:

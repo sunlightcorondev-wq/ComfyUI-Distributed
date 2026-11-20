@@ -11,7 +11,9 @@ import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SERVER_PATH = ROOT / "apps" / "adaptive_studio" / "server.py"
+APP_DIR = ROOT / "apps" / "adaptive_studio"
+SERVER_PATH = APP_DIR / "server.py"
+PARITY_PATH = APP_DIR / "parity_vectors.json"
 
 
 def _load_studio():
@@ -216,7 +218,7 @@ def test_health_and_ui_are_served(server):
     assert "text/html" in content_type
     assert b"Adaptive Studio" in body
 
-    for asset in ("styles.css", "app.js"):
+    for asset in ("styles.css", "app.js", "planner.js"):
         status, body, content_type = _get(f"{server}/{asset}")
         assert status == 200 and len(body) > 0, asset
 
@@ -262,3 +264,66 @@ def test_unknown_endpoint_post_is_404(server):
     with pytest.raises(urllib.error.HTTPError) as error:
         urllib.request.urlopen(request, timeout=5)
     assert error.value.code == 404
+
+
+# ---------------------------------------------------------------------------
+# Browser parity
+# ---------------------------------------------------------------------------
+
+def _fingerprint(plan):
+    return {
+        "num_segments": plan["num_segments"],
+        "frames": [segment["frames"] for segment in plan["segments"]],
+        "starts": [segment["start_frame"] for segment in plan["segments"]],
+        "ends": [segment["end_frame"] for segment in plan["segments"]],
+        "keyframe_frames": plan["keyframe_frames"],
+        "rendered_frames": plan["rendered_frames"],
+        "stitched_frames": plan["stitched_frames"],
+        "capped": plan["capped"],
+        "warnings": plan["warnings"],
+    }
+
+
+def _python_plan(case_input):
+    from utils.video_plan import plan_video_segments
+
+    return plan_video_segments(
+        total_frames=case_input["totalFrames"],
+        num_segments=case_input["numSegments"],
+        min_frames_per_segment=case_input["minFramesPerSegment"],
+        align_to_wan=case_input["alignToWan"],
+        share_boundary_frames=case_input["shareBoundaryFrames"],
+        num_participants=case_input["numParticipants"],
+    )
+
+
+def test_browser_parity_vectors_match_the_python_planner():
+    """The JS port is locked to this fixture; regenerate it when Python changes."""
+    vectors = json.loads(PARITY_PATH.read_text())
+    assert len(vectors["plan_cases"]) > 150
+
+    for case in vectors["plan_cases"]:
+        assert _fingerprint(_python_plan(case["input"])) == case["expected"], case["input"]
+
+
+def test_browser_parity_vectors_match_the_python_plan_response():
+    vectors = json.loads(PARITY_PATH.read_text())
+    for case in vectors["response_cases"]:
+        result = studio.build_plan(case["input"]["payload"], case["input"]["fleet"])
+        assert result["accounts"] == case["expected"]["accounts"], case["input"]["payload"]
+        assert result["summary"] == case["expected"]["summary"], case["input"]["payload"]
+        assert result["warnings"] == case["expected"]["warnings"], case["input"]["payload"]
+        assert studio.ffmpeg_script(result) == case["ffmpeg"], case["input"]["payload"]
+
+
+def test_browser_app_ships_the_planner_and_loads_it_first():
+    html = (APP_DIR / "web" / "index.html").read_text()
+    planner = (APP_DIR / "web" / "planner.js").read_text()
+
+    assert 'src="planner.js"' in html
+    assert 'src="app.js"' in html
+    # planner must be defined before the UI script runs
+    assert html.index('src="planner.js"') < html.index('src="app.js"')
+    # classic script (not a module) so file:// double-click also works
+    assert 'type="module"' not in html
+    assert "global.AdaptivePlanner" in planner

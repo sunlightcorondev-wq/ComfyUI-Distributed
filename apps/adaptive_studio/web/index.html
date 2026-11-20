@@ -20,12 +20,31 @@
       <p>Plan one video segment per Colab account, then stitch them back together.</p>
     </div>
   </div>
-  <div class="fleet" id="fleet-pill" title="Workers found in gpu_config.json">
-    <span class="dot"></span><span id="fleet-text">reading fleet…</span>
+  <div class="header-right">
+    <span class="mode" id="mode-badge" title="How this page is running">starting…</span>
+    <div class="fleet" id="fleet-pill" title="Workers found in gpu_config.json">
+      <span class="dot"></span><span id="fleet-text">reading fleet…</span>
+    </div>
   </div>
 </header>
 
 <main>
+  <section class="card import-card" id="import-card" hidden>
+    <div class="import-text">
+      <h2>Fleet</h2>
+      <p>Browser-only mode cannot read <code>gpu_config.json</code> by itself — import the file
+        from your ComfyUI folder (or start with the demo fleet). Nothing is uploaded anywhere.</p>
+    </div>
+    <div class="import-actions">
+      <label class="file-button">
+        Import gpu_config.json
+        <input id="fleet-file" type="file" accept="application/json,.json" hidden />
+      </label>
+      <button id="fleet-demo" class="ghost" type="button">Load demo fleet</button>
+      <button id="fleet-clear" class="ghost" type="button">Clear</button>
+    </div>
+  </section>
+
   <section class="card controls" aria-label="Plan settings">
     <div class="control">
       <label for="duration">Duration <output id="duration-out">6.00 s</output></label>
@@ -134,10 +153,11 @@
 </main>
 
 <footer>
-  <span>Adaptive Studio · runs locally beside ComfyUI · reads <code>gpu_config.json</code></span>
+  <span>Adaptive Studio · works standalone in the browser · richer with <code>python3 apps/adaptive_studio/server.py</code></span>
   <span id="meta">–</span>
 </footer>
 
+<script src="planner.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
