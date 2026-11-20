@@ -35,6 +35,15 @@ def _load_package_module(relative_path, module_suffix):
     logging_module.log = lambda *_args, **_kwargs: None
     sys.modules[f"{package_name}.utils.logging"] = logging_module
 
+    # The planner lives in the dependency-free utils/video_plan.py module.
+    plan_spec = importlib.util.spec_from_file_location(
+        f"{package_name}.utils.video_plan",
+        Path(__file__).resolve().parents[1] / "utils" / "video_plan.py",
+    )
+    plan_module = importlib.util.module_from_spec(plan_spec)
+    sys.modules[f"{package_name}.utils.video_plan"] = plan_module
+    plan_spec.loader.exec_module(plan_module)
+
     module_name = f"{package_name}.{'.'.join(parts + [module_path.stem])}"
     spec = importlib.util.spec_from_file_location(module_name, module_path)
     module = importlib.util.module_from_spec(spec)

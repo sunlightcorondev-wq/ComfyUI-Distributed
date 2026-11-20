@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Adaptive Studio — multi-account video planner</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="glow glow-a"></div>
+<div class="glow glow-b"></div>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="mark" aria-hidden="true">
+      <span></span><span></span><span></span><span></span>
+    </div>
+    <div>
+      <h1>Adaptive Studio</h1>
+      <p>Plan one video segment per Colab account, then stitch them back together.</p>
+    </div>
+  </div>
+  <div class="fleet" id="fleet-pill" title="Workers found in gpu_config.json">
+    <span class="dot"></span><span id="fleet-text">reading fleet…</span>
+  </div>
+</header>
+
+<main>
+  <section class="card controls" aria-label="Plan settings">
+    <div class="control">
+      <label for="duration">Duration <output id="duration-out">6.00 s</output></label>
+      <div class="dual">
+        <input id="duration" type="range" min="1" max="60" step="0.5" value="6" />
+        <input id="duration-num" type="number" min="0.1" max="3600" step="0.25" value="6" />
+      </div>
+    </div>
+
+    <div class="control">
+      <label for="fps">Frame rate</label>
+      <select id="fps">
+        <option value="8">8 fps</option>
+        <option value="12">12 fps</option>
+        <option value="16">16 fps</option>
+        <option value="24" selected>24 fps</option>
+        <option value="30">30 fps</option>
+      </select>
+    </div>
+
+    <div class="control">
+      <label for="accounts-mode">Accounts</label>
+      <div class="dual">
+        <select id="accounts-mode">
+          <option value="auto" selected>Auto (follow fleet)</option>
+          <option value="manual">Manual</option>
+        </select>
+        <input id="accounts" type="number" min="0" max="64" step="1" value="0" title="Worker accounts; the master adds one more when it participates" />
+      </div>
+      <small id="accounts-hint">0 = every enabled worker in the fleet</small>
+    </div>
+
+    <div class="control">
+      <label for="min-frames">Min frames per segment</label>
+      <input id="min-frames" type="number" min="1" max="1000" step="1" value="5" />
+      <small>Caps the segment count so clips never get too short.</small>
+    </div>
+
+    <div class="control toggles">
+      <label class="switch">
+        <input id="master" type="checkbox" checked />
+        <span></span> Master participates
+      </label>
+      <label class="switch">
+        <input id="align" type="checkbox" checked />
+        <span></span> Align to Wan (4k+1)
+      </label>
+      <label class="switch">
+        <input id="share" type="checkbox" checked />
+        <span></span> Share boundary frames
+      </label>
+    </div>
+  </section>
+
+  <section class="stats" aria-live="polite">
+    <div class="stat"><span class="stat-label">Accounts</span><strong id="stat-accounts">–</strong><small id="stat-accounts-note"></small></div>
+    <div class="stat"><span class="stat-label">Segments</span><strong id="stat-segments">–</strong><small id="stat-keyframes"></small></div>
+    <div class="stat"><span class="stat-label">Frames / account</span><strong id="stat-frames">–</strong><small id="stat-seconds"></small></div>
+    <div class="stat"><span class="stat-label">Final length</span><strong id="stat-stitched">–</strong><small id="stat-stitched-frames"></small></div>
+  </section>
+
+  <section class="card timeline-card">
+    <div class="card-head">
+      <h2>Segment timeline</h2>
+      <span class="tag" id="timeline-tag">–</span>
+    </div>
+    <div class="timeline" id="timeline"></div>
+    <div class="axis" id="axis"></div>
+    <div class="keyframes" id="keyframes"></div>
+    <p class="hint">Keyframes are the boundary frames every account renders from — generate one image per chip, then feed the pair into your FLF2V start/end inputs.</p>
+  </section>
+
+  <div class="grid">
+    <section class="card">
+      <div class="card-head">
+        <h2>Per-account jobs</h2>
+        <span class="tag" id="table-tag">–</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th></th><th>Slot</th><th>Account</th><th>Segment</th><th>Frames</th><th>Seconds</th></tr>
+          </thead>
+          <tbody id="accounts-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card notes-card">
+      <div class="card-head"><h2>Notes</h2></div>
+      <ul class="warnings" id="warnings"></ul>
+      <div class="exports">
+        <button data-copy="plan">Copy plan JSON</button>
+        <button data-copy="keyframes">Copy keyframe times</button>
+        <button data-copy="ffmpeg">Copy FFmpeg script</button>
+        <button data-copy="download" class="ghost">Download plan.json</button>
+      </div>
+      <p class="copy-status" id="copy-status"></p>
+      <p class="hint">
+        Paste the keyframe times into your keyframe generator, and wire
+        <code>Adaptive Video Segments</code> → <code>Adaptive Video Stitcher</code> in the
+        workflow. Everything here matches what the nodes compute at dispatch.
+      </p>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <span>Adaptive Studio · runs locally beside ComfyUI · reads <code>gpu_config.json</code></span>
+  <span id="meta">–</span>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>

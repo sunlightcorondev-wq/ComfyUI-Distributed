@@ -32,6 +32,14 @@ def _load_utilities_module():
     logging_module.log = lambda *_args, **_kwargs: None
     sys.modules[f"{package_name}.utils.logging"] = logging_module
 
+    plan_spec = importlib.util.spec_from_file_location(
+        f"{package_name}.utils.video_plan",
+        Path(__file__).resolve().parents[1] / "utils" / "video_plan.py",
+    )
+    plan_module = importlib.util.module_from_spec(plan_spec)
+    sys.modules[f"{package_name}.utils.video_plan"] = plan_module
+    plan_spec.loader.exec_module(plan_module)
+
     spec = importlib.util.spec_from_file_location(
         f"{package_name}.nodes.utilities",
         module_path,

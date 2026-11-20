@@ -37,6 +37,15 @@ class DistributedValueTests(unittest.TestCase):
         logging_mod.log = lambda *_a, **_k: None
         sys.modules[f"{pkg_name}.utils.logging"] = logging_mod
 
+        # The planner lives in the dependency-free utils/video_plan.py module.
+        plan_spec = importlib.util.spec_from_file_location(
+            f"{pkg_name}.utils.video_plan",
+            Path(__file__).resolve().parents[1] / "utils" / "video_plan.py",
+        )
+        plan_mod = importlib.util.module_from_spec(plan_spec)
+        sys.modules[f"{pkg_name}.utils.video_plan"] = plan_mod
+        plan_spec.loader.exec_module(plan_mod)
+
         spec = importlib.util.spec_from_file_location(
             f"{pkg_name}.nodes.utilities", module_path
         )

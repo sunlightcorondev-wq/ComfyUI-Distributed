@@ -127,6 +127,16 @@ Split one long video into one segment per participating account instead of a fix
 3. Add **Adaptive Video Stitcher**, wire the collector's combined `images` and the planner's `plan` into it, then save its `images`
 4. Enable as many accounts as you like and run; the plan re-derives itself on every dispatch
 
+Run the planner in a browser (no ComfyUI needed):
+
+```bash
+python3 apps/adaptive_studio/server.py        # http://localhost:8765
+```
+
+Bring each Google account online with `apps/colab_worker.ipynb`: it installs ComfyUI and this extension, starts a worker, opens a Cloudflare tunnel, and registers itself with the master.
+
+> [App and notebook guide](/apps/README.md)
+
 ### Distributed Image Upscaling
 Accelerate Ultimate SD Upscaler by distributing tiles across multiple workers, with speed scaling as you add more GPUs.
 

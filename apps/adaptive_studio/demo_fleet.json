@@ -1,0 +1,45 @@
+{
+  "master": {
+    "host": ""
+  },
+  "settings": {
+    "master_delegate_only": false
+  },
+  "workers": [
+    {
+      "id": "colab-a",
+      "name": "Colab A (T4)",
+      "type": "remote",
+      "host": "https://colab-a.trycloudflare.com",
+      "port": 443
+    },
+    {
+      "id": "colab-b",
+      "name": "Colab B (T4)",
+      "type": "remote",
+      "host": "https://colab-b.trycloudflare.com",
+      "port": 443
+    },
+    {
+      "id": "colab-c",
+      "name": "Colab C (L4)",
+      "type": "remote",
+      "host": "https://colab-c.trycloudflare.com",
+      "port": 443
+    },
+    {
+      "id": "colab-d",
+      "name": "Colab D (T4)",
+      "type": "remote",
+      "host": "https://colab-d.trycloudflare.com",
+      "port": 443
+    },
+    {
+      "id": "colab-e",
+      "name": "Colab E (L4)",
+      "type": "remote",
+      "host": "https://colab-e.trycloudflare.com",
+      "port": 443
+    }
+  ]
+}
