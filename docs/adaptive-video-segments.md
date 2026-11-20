@@ -169,6 +169,10 @@ using either the combined batch plus the plan or the per-account sockets.
 - **Static workers only.** Serverless pools still reject the dividers and
   adaptive nodes, because a pool cannot be told which segment it owns. Adaptive
   video targets the master + worker fleet (including Colab-hosted workers).
+- **Short segments are flagged.** Below 0.5 s per account the planner adds a
+  warning to `plan`; use a longer video or fewer segments for better motion.
+  See the [multi-account test report](multi-account-test-report.md) for the
+  verified fleet sizes (1 to 20 accounts) and the manual acceptance checklist.
 - **Every account needs the same resolution.** The stitcher refuses to join
   mismatched sizes; keep width/height identical across the workflow copies.
 

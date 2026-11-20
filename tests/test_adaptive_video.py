@@ -137,10 +137,18 @@ class PlannerNodeTests(unittest.TestCase):
     def test_worker_gets_its_own_segment_window(self):
         result = self._plan(["worker-a", "worker-b", "worker-c"], worker_id="worker_2", is_worker=True)
         plan = json.loads(result[0])
-        self.assertEqual(result[2], 2)
-        self.assertEqual(result[3], plan["segments"][2]["start_frame"])
-        self.assertEqual(result[4], plan["segments"][2]["end_frame"])
-        self.assertEqual(result[5], plan["segments"][2]["frames"])
+        # master + 3 workers: worker_2 renders the fourth segment.
+        self.assertEqual(result[2], 3)
+        self.assertEqual(result[3], plan["segments"][3]["start_frame"])
+        self.assertEqual(result[4], plan["segments"][3]["end_frame"])
+        self.assertEqual(result[5], plan["segments"][3]["frames"])
+
+    def test_master_participating_shifts_worker_segments_by_one(self):
+        participating = self._plan(["worker-a"], worker_id="worker_0", is_worker=True)
+        delegating = self._plan(["worker-a"], worker_id="worker_0", is_worker=True,
+                                delegate_only=True)
+        self.assertEqual(participating[2], 1)
+        self.assertEqual(delegating[2], 0)
 
     def test_keyframe_times_are_reported_in_seconds(self):
         # master + 2 workers = 3 segments over 6s -> keyframes at 0/2/4/6s.
@@ -152,9 +160,15 @@ class PlannerNodeTests(unittest.TestCase):
         self.assertEqual(result[1], 6)
 
     def test_keyframe_indexes_bracket_the_segment(self):
-        first = self._plan(["worker-a", "worker-b"], worker_id="worker_1", is_worker=True)
-        self.assertEqual(first[8], 1)
-        self.assertEqual(first[9], 2)
+        result = self._plan(["worker-a", "worker-b"], worker_id="worker_1", is_worker=True)
+        self.assertEqual(result[2], 2)
+        self.assertEqual(result[8], 2)
+        self.assertEqual(result[9], 3)
+
+    def test_very_short_segments_are_warned_about(self):
+        result = self._plan([f"worker-{index}" for index in range(19)])
+        plan = json.loads(result[0])
+        self.assertTrue(any("only" in warning for warning in plan["warnings"]))
 
     def test_out_of_range_worker_reuses_last_segment(self):
         result = self._plan(["worker-a"], worker_id="worker_9", is_worker=True)

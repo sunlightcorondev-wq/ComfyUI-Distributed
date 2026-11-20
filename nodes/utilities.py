@@ -627,12 +627,14 @@ class DistributedVideoPlanner:
         plan["participants"] = participants
 
         # Which segment does this participant render? The master takes the
-        # first one; workers use their positional index from the enabled list.
+        # first one; workers use their positional index from the enabled list
+        # and shift past the master's segment when it participates. That keeps
+        # worker_N's collector preview slot aligned with segment N + 1.
         index = 0
         if is_worker:
             parsed = _parse_worker_index(worker_id)
             if parsed is not None:
-                index = parsed
+                index = parsed + (0 if delegate_only else 1)
         if index >= plan["num_segments"]:
             plan["warnings"].append(
                 f"Participant index {index} exceeds the {plan['num_segments']}-segment plan; "
@@ -643,6 +645,13 @@ class DistributedVideoPlanner:
 
         segment = plan["segments"][index]
         keyframe_times = ",".join(f"{frame / float(fps):.3f}" for frame in plan["keyframe_frames"])
+
+        shortest_seconds = min(seg["frames"] for seg in plan["segments"]) / float(fps)
+        if shortest_seconds < 0.5:
+            plan["warnings"].append(
+                f"Each account renders only {shortest_seconds:.2f}s; a longer video or fewer "
+                "segments keeps motion quality up."
+            )
 
         for warning in plan["warnings"]:
             log(f"[Adaptive Video] {warning}")
